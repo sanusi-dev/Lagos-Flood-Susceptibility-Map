@@ -1,0 +1,18 @@
+# Virtual environment
+.venv/
+venv/
+ENV/
+
+# Python bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Raw downloads and large intermediate GeoTIFFs (regenerated via `python -m pipeline.run_all`)
+data/raw/
+data/processed/
+
+# OS / IDE files
+.DS_Store
+.idea/
+.vscode/

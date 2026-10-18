@@ -1,0 +1,12 @@
+django==6.1.2
+rasterio==1.5.2
+numpy==2.5.4
+geopandas==1.2.0
+whitebox==2.3.6
+osmnx==2.1.1
+shapely==2.2.0
+pyproj==3.8.0
+scipy==1.18.1
+matplotlib==3.11.2
+pillow==13.0.0
+requests==2.34.2

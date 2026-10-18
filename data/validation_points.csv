@@ -1,0 +1,11 @@
+id,name,lga,source,lat,lon
+1,Isheri North Floodplain,Kosofe / Ogun River,NIHSA Annual Flood Outlook & LASEMA,6.6320,3.4050
+2,Agboyi-Ketu Community,Kosofe,NIHSA Annual Flood Outlook & LASEMA,6.5935,3.4025
+3,Majidun River Floodplain,Ikorodu,NIHSA Annual Flood Outlook & LASEMA,6.6245,3.4715
+4,Gbagada-Oworonshoki Lowland,Kosofe,LASEMA & Nkwunonwo et al. (2016),6.5520,3.3980
+5,Ajegunle Canal Corridor,Ajeromi-Ifelodun,Adelekan (2010) Environment & Urbanization,6.4695,3.3525
+6,Ebute Metta / Costain Basin,Lagos Mainland,Adelekan (2010) Environment & Urbanization,6.4785,3.3720
+7,Idi-Araba / Surulere System 5 Corridor,Mushin / Surulere,World Bank LMDGP & Nkwunonwo et al. (2016),6.5160,3.3560
+8,Lekki Phase 1 Basin,Eti-Osa,Nkwunonwo et al. (2016) NHESS,6.4455,3.4755
+9,Victoria Island (Ahmadu Bello Corridor),Eti-Osa,Adelekan (2010) & Nkwunonwo et al. (2016),6.4281,3.4219
+10,Ijegun-Ikotun Urban Lowland,Alimosho,LASEMA Flood Response Reports,6.5260,3.2620

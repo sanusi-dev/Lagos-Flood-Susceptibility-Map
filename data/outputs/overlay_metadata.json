@@ -1,0 +1,59 @@
+{
+  "crs_analysis": "EPSG:32631",
+  "crs_web_overlay": "EPSG:4326",
+  "leaflet_bounds": [
+    [
+      6.3,
+      3.0
+    ],
+    [
+      6.8,
+      4.0
+    ]
+  ],
+  "thresholds": {
+    "hand_high_max_m": 2.0,
+    "hand_medium_max_m": 5.0,
+    "dist_high_max_m": 300.0,
+    "dist_medium_max_m": 600.0,
+    "slope_flat_max_deg": 1.5,
+    "slope_moderate_max_deg": 3.0,
+    "weights": {
+      "hand": 0.6,
+      "distance_to_drainage": 0.25,
+      "slope": 0.15
+    },
+    "score_cutoffs": {
+      "high_min": 2.4,
+      "medium_min": 1.75
+    }
+  },
+  "classes": {
+    "1": {
+      "label": "Low",
+      "color_hex": "#2ca25f",
+      "land_cells": 2023844,
+      "land_area_km2": 1821.46,
+      "land_share_pct": 43.26
+    },
+    "2": {
+      "label": "Medium",
+      "color_hex": "#feb24c",
+      "land_cells": 838760,
+      "land_area_km2": 754.88,
+      "land_share_pct": 17.93
+    },
+    "3": {
+      "label": "High",
+      "color_hex": "#e31a1c",
+      "land_cells": 1815470,
+      "land_area_km2": 1633.92,
+      "land_share_pct": 38.81
+    },
+    "0": {
+      "label": "Water / NoData",
+      "cells": 2131815,
+      "area_km2": 1918.63
+    }
+  }
+}

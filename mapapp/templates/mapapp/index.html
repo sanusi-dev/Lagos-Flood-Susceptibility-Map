@@ -1,0 +1,743 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lagos Flood Susceptibility Map · Terrain &amp; HAND Observatory</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+  <style>
+    :root {
+      --bg-console: #0b1524;
+      --bg-card: #122136;
+      --bg-card-elev: #182b45;
+      --border-hairline: #263e5c;
+      --text-primary: #f1f5f9;
+      --text-secondary: #94a3b8;
+      --text-muted: #64748b;
+      --accent-cyan: #38bdf8;
+      --risk-high: #e31a1c;
+      --risk-medium: #feb24c;
+      --risk-low: #2ca25f;
+      --risk-water: #38bdf8;
+      --risk-oob: #94a3b8;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html, body {
+      height: 100%;
+      width: 100%;
+      overflow: hidden;
+      background: var(--bg-console);
+      color: var(--text-primary);
+      font-family: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, sans-serif;
+      font-size: 14px;
+      line-height: 1.45;
+    }
+
+    .app-shell {
+      display: grid;
+      grid-template-columns: 390px 1fr;
+      height: 100vh;
+      width: 100vw;
+    }
+
+    .sidebar {
+      background: var(--bg-console);
+      border-right: 1px solid var(--border-hairline);
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+      z-index: 500;
+    }
+
+    .brand-header {
+      padding: 18px 20px 15px;
+      border-bottom: 1px solid var(--border-hairline);
+      background: linear-gradient(180deg, #102038 0%, #0b1524 100%);
+    }
+
+    .eyebrow {
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--accent-cyan);
+      margin-bottom: 4px;
+    }
+
+    .brand-title {
+      font-family: "Space Grotesk", sans-serif;
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: var(--text-primary);
+    }
+
+    .brand-note {
+      margin-top: 6px;
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+
+    .panel-section {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border-hairline);
+    }
+
+    .section-title {
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+      color: var(--text-secondary);
+      margin-bottom: 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    /* Inspector Card */
+    .inspector-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-hairline);
+      border-radius: 6px;
+      padding: 14px;
+    }
+
+    .inspector-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--border-hairline);
+    }
+
+    .coords-stack {
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 11.5px;
+      color: var(--text-secondary);
+    }
+
+    .coords-stack div strong {
+      color: var(--text-primary);
+      font-weight: 500;
+    }
+
+    .risk-badge {
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 5px 10px;
+      border-radius: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      background: var(--bg-card-elev);
+      color: var(--text-primary);
+      border: 1px solid var(--border-hairline);
+    }
+
+    .risk-badge[data-risk="High"] {
+      background: rgba(227, 26, 28, 0.22);
+      color: #ff6b6b;
+      border-color: var(--risk-high);
+    }
+
+    .risk-badge[data-risk="Medium"] {
+      background: rgba(254, 178, 76, 0.22);
+      color: #ffd166;
+      border-color: var(--risk-medium);
+    }
+
+    .risk-badge[data-risk="Low"] {
+      background: rgba(44, 162, 95, 0.22);
+      color: #6ee7b7;
+      border-color: var(--risk-low);
+    }
+
+    .risk-badge[data-risk="Water / NoData"] {
+      background: rgba(56, 189, 248, 0.18);
+      color: #7dd3fc;
+      border-color: var(--risk-water);
+    }
+
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .metric-box {
+      background: var(--bg-console);
+      border: 1px solid var(--border-hairline);
+      border-radius: 4px;
+      padding: 8px 10px;
+    }
+
+    .metric-label {
+      font-size: 11px;
+      color: var(--text-secondary);
+      margin-bottom: 2px;
+    }
+
+    .metric-value {
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .metric-unit {
+      font-size: 11px;
+      font-weight: 400;
+      color: var(--text-secondary);
+    }
+
+    /* Signature Element: HAND Vertical Gauge */
+    .hand-gauge-wrap {
+      margin-top: 8px;
+      padding-top: 10px;
+      border-top: 1px solid var(--border-hairline);
+    }
+
+    .hand-gauge-header {
+      display: flex;
+      justify-content: space-between;
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 10.5px;
+      color: var(--text-secondary);
+      margin-bottom: 5px;
+    }
+
+    .hand-gauge-track {
+      position: relative;
+      height: 10px;
+      border-radius: 3px;
+      background: linear-gradient(
+        90deg,
+        #e31a1c 0%,
+        #e31a1c 20%,
+        #feb24c 20%,
+        #feb24c 50%,
+        #2ca25f 50%,
+        #2ca25f 100%
+      );
+      margin-bottom: 4px;
+    }
+
+    .hand-gauge-marker {
+      position: absolute;
+      top: -4px;
+      width: 4px;
+      height: 18px;
+      background: #ffffff;
+      border: 1px solid #000000;
+      border-radius: 2px;
+      transform: translateX(-50%);
+      transition: left 0.2s ease-out;
+      left: 0%;
+      display: none;
+    }
+
+    .hand-gauge-ticks {
+      display: flex;
+      justify-content: space-between;
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 10px;
+      color: var(--text-muted);
+    }
+
+    .inspector-message {
+      margin-top: 10px;
+      font-size: 12px;
+      color: var(--text-secondary);
+      background: rgba(15, 28, 46, 0.6);
+      padding: 7px 9px;
+      border-radius: 4px;
+      border-left: 3px solid var(--accent-cyan);
+    }
+
+    /* Preset Chips */
+    .preset-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 10px;
+    }
+
+    .preset-btn {
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 11px;
+      background: var(--bg-card);
+      color: var(--text-primary);
+      border: 1px solid var(--border-hairline);
+      border-radius: 4px;
+      padding: 4px 8px;
+      cursor: pointer;
+      transition: background 0.12s, border-color 0.12s;
+    }
+
+    .preset-btn:hover {
+      background: var(--bg-card-elev);
+      border-color: var(--accent-cyan);
+    }
+
+    /* Controls */
+    .control-row {
+      margin-bottom: 12px;
+    }
+
+    .control-row:last-child {
+      margin-bottom: 0;
+    }
+
+    .slider-label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12.5px;
+      margin-bottom: 6px;
+      color: var(--text-primary);
+    }
+
+    .slider-label span:last-child {
+      font-family: "IBM Plex Mono", monospace;
+      color: var(--accent-cyan);
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--accent-cyan);
+      cursor: pointer;
+    }
+
+    .toggle-label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12.5px;
+      cursor: pointer;
+      color: var(--text-primary);
+      margin-top: 8px;
+    }
+
+    /* Legend */
+    .legend-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .legend-item {
+      display: grid;
+      grid-template-columns: 16px 1fr auto;
+      align-items: center;
+      gap: 10px;
+      font-size: 12.5px;
+    }
+
+    .swatch {
+      width: 16px;
+      height: 16px;
+      border-radius: 3px;
+      border: 1px solid rgba(255, 255, 255, 0.25);
+    }
+
+    .legend-desc {
+      color: var(--text-primary);
+      font-weight: 500;
+    }
+
+    .legend-sub {
+      display: block;
+      font-size: 11px;
+      color: var(--text-secondary);
+      font-weight: 400;
+    }
+
+    .legend-share {
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 11.5px;
+      color: var(--text-secondary);
+    }
+
+    /* Map Container */
+    .map-stage {
+      position: relative;
+      height: 100%;
+      width: 100%;
+    }
+
+    #map {
+      height: 100%;
+      width: 100%;
+      background: #091321;
+    }
+
+    .map-banner {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      z-index: 450;
+      background: rgba(11, 21, 36, 0.9);
+      border: 1px solid var(--border-hairline);
+      border-radius: 5px;
+      padding: 8px 12px;
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 11.5px;
+      color: var(--text-primary);
+      pointer-events: none;
+    }
+
+    .leaflet-popup-content-wrapper {
+      background: #0f1c2e;
+      color: #f1f5f9;
+      border: 1px solid #263e5c;
+      border-radius: 6px;
+      font-family: "IBM Plex Sans", sans-serif;
+    }
+
+    .leaflet-popup-tip {
+      background: #0f1c2e;
+    }
+
+    @media (max-width: 860px) {
+      .app-shell {
+        grid-template-columns: 1fr;
+        grid-template-rows: 52vh 48vh;
+      }
+      .sidebar {
+        order: 2;
+        border-right: none;
+        border-top: 1px solid var(--border-hairline);
+      }
+      .map-stage {
+        order: 1;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <header class="brand-header">
+        <div class="eyebrow">Copernicus GLO-30 · EPSG:32631 (UTM 31N)</div>
+        <h1 class="brand-title">Lagos Flood Susceptibility</h1>
+        <p class="brand-note">
+          Terrain runoff accumulation model using Height Above Nearest Drainage (HAND), channel proximity, and slope. Susceptibility only, not a real-time flood forecast.
+        </p>
+      </header>
+
+      <section class="panel-section">
+        <div class="section-title">
+          <span>Point Hydrological Readout</span>
+          <span id="crs-tag">EPSG:32631</span>
+        </div>
+
+        <div class="inspector-card">
+          <div class="inspector-top">
+            <div class="coords-stack">
+              <div>WGS84: <strong id="val-latlon">Click map to sample</strong></div>
+              <div>UTM 31N: <strong id="val-utm">—</strong></div>
+            </div>
+            <span class="risk-badge" id="val-risk-badge" data-risk="None">Awaiting Click</span>
+          </div>
+
+          <div class="metrics-grid">
+            <div class="metric-box">
+              <div class="metric-label">Elevation (EGM2008)</div>
+              <div class="metric-value" id="val-elev">—</div>
+            </div>
+            <div class="metric-box">
+              <div class="metric-label">HAND (Above Drain)</div>
+              <div class="metric-value" id="val-hand">—</div>
+            </div>
+            <div class="metric-box">
+              <div class="metric-label">Nearest Drainage</div>
+              <div class="metric-value" id="val-dist">—</div>
+            </div>
+            <div class="metric-box">
+              <div class="metric-label">Terrain Slope</div>
+              <div class="metric-value" id="val-slope">—</div>
+            </div>
+          </div>
+
+          <div class="hand-gauge-wrap">
+            <div class="hand-gauge-header">
+              <span>HAND Vertical Clearance Scale</span>
+              <span id="gauge-reading">—</span>
+            </div>
+            <div class="hand-gauge-track">
+              <div class="hand-gauge-marker" id="hand-marker"></div>
+            </div>
+            <div class="hand-gauge-ticks">
+              <span>0m (Channel)</span>
+              <span>2m (High)</span>
+              <span>5m (Med)</span>
+              <span>10m+ (Low)</span>
+            </div>
+          </div>
+
+          <div class="inspector-message" id="val-message">
+            Click any location on the map or pick a benchmark point below to query `/api/point/`.
+          </div>
+        </div>
+
+        <div class="preset-grid">
+          <button class="preset-btn" type="button" data-lat="6.5880" data-lon="3.4020">Kosofe / Ogun Valley</button>
+          <button class="preset-btn" type="button" data-lat="6.4281" data-lon="3.4219">Victoria Island</button>
+          <button class="preset-btn" type="button" data-lat="6.4474" data-lon="3.4723">Lekki Phase 1</button>
+          <button class="preset-btn" type="button" data-lat="6.5015" data-lon="3.3581">Surulere</button>
+          <button class="preset-btn" type="button" data-lat="6.6018" data-lon="3.3515">Ikeja Upland</button>
+          <button class="preset-btn" type="button" data-lat="6.5100" data-lon="3.4800">Lagos Lagoon</button>
+          <button class="preset-btn" type="button" data-lat="6.9000" data-lon="3.5000">Out of Bounds</button>
+        </div>
+      </section>
+
+      <section class="panel-section">
+        <div class="section-title">
+          <span>Layer Controls</span>
+        </div>
+
+        <div class="control-row">
+          <div class="slider-label">
+            <span>Susceptibility Overlay Opacity</span>
+            <span id="opacity-readout">72%</span>
+          </div>
+          <input id="opacity-slider" type="range" min="0" max="100" value="72" />
+        </div>
+
+        <label class="toggle-label">
+          <input id="toggle-risk" type="checkbox" checked />
+          <span>Show Flood Susceptibility Raster</span>
+        </label>
+
+        <label class="toggle-label">
+          <input id="toggle-streams" type="checkbox" />
+          <span>Show Extracted D8 Drainage Network (GeoJSON)</span>
+        </label>
+      </section>
+
+      <section class="panel-section">
+        <div class="section-title">
+          <span>Susceptibility Legend (Land Area)</span>
+        </div>
+
+        <div class="legend-list">
+          <div class="legend-item">
+            <span class="swatch" style="background: #e31a1c;"></span>
+            <div>
+              <span class="legend-desc">High Susceptibility</span>
+              <span class="legend-sub">HAND &le; 2.0 m, near channel (&le; 300 m), flat terrain</span>
+            </div>
+            <span class="legend-share">38.8%</span>
+          </div>
+
+          <div class="legend-item">
+            <span class="swatch" style="background: #feb24c;"></span>
+            <div>
+              <span class="legend-desc">Medium Susceptibility</span>
+              <span class="legend-sub">HAND 2.0–5.0 m, moderate distance (300–600 m)</span>
+            </div>
+            <span class="legend-share">17.9%</span>
+          </div>
+
+          <div class="legend-item">
+            <span class="swatch" style="background: #2ca25f;"></span>
+            <div>
+              <span class="legend-desc">Low Susceptibility</span>
+              <span class="legend-sub">HAND &gt; 5.0 m, upland interfluves &amp; steeper slopes</span>
+            </div>
+            <span class="legend-share">43.3%</span>
+          </div>
+
+          <div class="legend-item">
+            <span class="swatch" style="background: #38bdf8;"></span>
+            <div>
+              <span class="legend-desc">Permanent Water / Lagoon</span>
+              <span class="legend-sub">Lagos Lagoon, creeks &amp; Atlantic Ocean (WBM)</span>
+            </div>
+            <span class="legend-share">Water</span>
+          </div>
+        </div>
+      </section>
+    </aside>
+
+    <main class="map-stage">
+      <div class="map-banner">Click anywhere on the map to inspect terrain &amp; HAND metrics</div>
+      <div id="map"></div>
+    </main>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+  <script>
+    const OVERLAY_META = {{ overlay_metadata_json|safe }};
+    const bounds = OVERLAY_META.leaflet_bounds || [[6.3, 3.0], [6.8, 4.0]];
+
+    const map = L.map("map", {
+      center: [6.525, 3.45],
+      zoom: 11,
+      preferCanvas: true
+    });
+
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 18,
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors | Copernicus GLO-30 DEM'
+    }).addTo(map);
+
+    const riskOverlay = L.imageOverlay("/static/risk_overlay_wgs84.png", bounds, {
+      opacity: 0.72,
+      interactive: false
+    }).addTo(map);
+
+    // Study area bounding box outline
+    L.rectangle(bounds, {
+      color: "#38bdf8",
+      weight: 1.5,
+      fill: false,
+      dashArray: "6,4",
+      interactive: false
+    }).addTo(map);
+
+    let streamsLayer = null;
+    let activeMarker = null;
+
+    const opacitySlider = document.getElementById("opacity-slider");
+    const opacityReadout = document.getElementById("opacity-readout");
+    const toggleRisk = document.getElementById("toggle-risk");
+    const toggleStreams = document.getElementById("toggle-streams");
+
+    opacitySlider.addEventListener("input", (e) => {
+      const val = Number(e.target.value);
+      opacityReadout.textContent = `${val}%`;
+      riskOverlay.setOpacity(val / 100.0);
+    });
+
+    toggleRisk.addEventListener("change", (e) => {
+      if (e.target.checked) {
+        riskOverlay.addTo(map);
+      } else {
+        map.removeLayer(riskOverlay);
+      }
+    });
+
+    toggleStreams.addEventListener("change", async (e) => {
+      if (e.target.checked) {
+        if (!streamsLayer) {
+          const resp = await fetch("/static/streams_wgs84.geojson");
+          const geojson = await resp.json();
+          streamsLayer = L.geoJSON(geojson, {
+            style: {
+              color: "#0284c7",
+              weight: 1.4,
+              opacity: 0.9
+            }
+          });
+        }
+        streamsLayer.addTo(map);
+      } else if (streamsLayer) {
+        map.removeLayer(streamsLayer);
+      }
+    });
+
+    function formatMetric(value, unit, digits = 2) {
+      if (value === null || value === undefined || Number.isNaN(Number(value))) {
+        return "—";
+      }
+      return `${Number(value).toFixed(digits)} <span class="metric-unit">${unit}</span>`;
+    }
+
+    function updateInspectorUI(data) {
+      document.getElementById("val-latlon").textContent = `${Number(data.lat).toFixed(4)}°N, ${Number(data.lon).toFixed(4)}°E`;
+      if (data.utm_easting_m && data.utm_northing_m) {
+        document.getElementById("val-utm").textContent = `${Math.round(data.utm_easting_m)}E, ${Math.round(data.utm_northing_m)}N`;
+      } else {
+        document.getElementById("val-utm").textContent = "—";
+      }
+
+      const badge = document.getElementById("val-risk-badge");
+      badge.textContent = data.risk_class || "Unknown";
+      badge.setAttribute("data-risk", data.risk_class || "None");
+
+      document.getElementById("val-elev").innerHTML = formatMetric(data.elevation, "m", 2);
+      document.getElementById("val-hand").innerHTML = formatMetric(data.hand, "m", 2);
+      document.getElementById("val-dist").innerHTML = formatMetric(data.distance_to_drainage, "m", 1);
+      document.getElementById("val-slope").innerHTML = formatMetric(data.slope_deg, "°", 2);
+      document.getElementById("val-message").textContent = data.message || "";
+
+      const markerEl = document.getElementById("hand-marker");
+      const gaugeReading = document.getElementById("gauge-reading");
+      if (data.hand !== null && data.hand !== undefined) {
+        const pct = Math.min(100, Math.max(0, (Number(data.hand) / 10.0) * 100.0));
+        markerEl.style.display = "block";
+        markerEl.style.left = `${pct}%`;
+        gaugeReading.textContent = `HAND = ${Number(data.hand).toFixed(2)} m`;
+      } else {
+        markerEl.style.display = "none";
+        gaugeReading.textContent = data.risk_class || "—";
+      }
+    }
+
+    async function inspectPoint(lat, lon, pan = false) {
+      if (pan) {
+        map.panTo([lat, lon]);
+      }
+      if (!activeMarker) {
+        activeMarker = L.circleMarker([lat, lon], {
+          radius: 7,
+          color: "#ffffff",
+          weight: 2,
+          fillColor: "#38bdf8",
+          fillOpacity: 0.95
+        }).addTo(map);
+      } else {
+        activeMarker.setLatLng([lat, lon]);
+      }
+
+      const response = await fetch(`/api/point/?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}`);
+      const data = await response.json();
+      updateInspectorUI(data);
+
+      const popupHtml = `
+        <div style="min-width: 195px; font-size: 12.5px; line-height: 1.5;">
+          <div style="font-weight: 700; font-size: 13.5px; margin-bottom: 4px;">
+            Risk Class: ${data.risk_class}
+          </div>
+          <div><strong>Elevation:</strong> ${data.elevation !== null ? data.elevation + " m" : "N/A"}</div>
+          <div><strong>HAND:</strong> ${data.hand !== null ? data.hand + " m" : "N/A"}</div>
+          <div><strong>Nearest Drainage:</strong> ${data.distance_to_drainage !== null ? data.distance_to_drainage + " m" : "N/A"}</div>
+          <div><strong>Slope:</strong> ${data.slope_deg !== null ? data.slope_deg + "°" : "N/A"}</div>
+          <div style="color: #94a3b8; font-size: 11px; margin-top: 4px;">
+            UTM 31N: ${Math.round(data.utm_easting_m)}E, ${Math.round(data.utm_northing_m)}N
+          </div>
+        </div>
+      `;
+      activeMarker.bindPopup(popupHtml).openPopup();
+    }
+
+    map.on("click", (e) => {
+      inspectPoint(e.latlng.lat, e.latlng.lng, false);
+    });
+
+    document.querySelectorAll(".preset-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const lat = parseFloat(btn.getAttribute("data-lat"));
+        const lon = parseFloat(btn.getAttribute("data-lon"));
+        inspectPoint(lat, lon, true);
+      });
+    });
+
+    // Sample initial benchmark point on load (Kosofe / Ogun River floodplain)
+    inspectPoint(6.5880, 3.4020, false);
+  </script>
+</body>
+</html>
