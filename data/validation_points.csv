@@ -1,11 +1,41 @@
-id,name,lga,source,lat,lon
-1,Isheri North Floodplain,Kosofe / Ogun River,NIHSA Annual Flood Outlook & LASEMA,6.6320,3.4050
-2,Agboyi-Ketu Community,Kosofe,NIHSA Annual Flood Outlook & LASEMA,6.5935,3.4025
-3,Majidun River Floodplain,Ikorodu,NIHSA Annual Flood Outlook & LASEMA,6.6245,3.4715
-4,Gbagada-Oworonshoki Lowland,Kosofe,LASEMA & Nkwunonwo et al. (2016),6.5520,3.3980
-5,Ajegunle Canal Corridor,Ajeromi-Ifelodun,Adelekan (2010) Environment & Urbanization,6.4695,3.3525
-6,Ebute Metta / Costain Basin,Lagos Mainland,Adelekan (2010) Environment & Urbanization,6.4785,3.3720
-7,Idi-Araba / Surulere System 5 Corridor,Mushin / Surulere,World Bank LMDGP & Nkwunonwo et al. (2016),6.5160,3.3560
-8,Lekki Phase 1 Basin,Eti-Osa,Nkwunonwo et al. (2016) NHESS,6.4455,3.4755
-9,Victoria Island (Ahmadu Bello Corridor),Eti-Osa,Adelekan (2010) & Nkwunonwo et al. (2016),6.4281,3.4219
-10,Ijegun-Ikotun Urban Lowland,Alimosho,LASEMA Flood Response Reports,6.5260,3.2620
+id,name,lga,source,lat,lon,site_type
+1,Isheri North Floodplain,Kosofe / Ogun River,NIHSA Annual Flood Outlook & LASEMA,6.6320,3.4050,flood_prone
+2,Agboyi-Ketu Community,Kosofe,NIHSA Annual Flood Outlook & LASEMA,6.5935,3.4025,flood_prone
+3,Majidun River Floodplain,Ikorodu,NIHSA Annual Flood Outlook & LASEMA,6.6245,3.4715,flood_prone
+4,Gbagada-Oworonshoki Lowland,Kosofe,LASEMA & Nkwunonwo et al. (2016),6.5520,3.3980,flood_prone
+5,Ajegunle Canal Corridor,Ajeromi-Ifelodun,Adelekan (2010) Environment & Urbanization,6.4695,3.3525,flood_prone
+6,Ebute Metta / Costain Basin,Lagos Mainland,Adelekan (2010) Environment & Urbanization,6.4785,3.3720,flood_prone
+7,Idi-Araba / Surulere System 5 Corridor,Mushin / Surulere,World Bank LMDGP & Nkwunonwo et al. (2016),6.5160,3.3560,flood_prone
+8,Lekki Phase 1 Basin,Eti-Osa,Nkwunonwo et al. (2016) NHESS,6.4455,3.4755,flood_prone
+9,Victoria Island (Ahmadu Bello Corridor),Eti-Osa,Adelekan (2010) & Nkwunonwo et al. (2016),6.4281,3.4219,flood_prone
+10,Ijegun-Ikotun Urban Lowland,Alimosho,LASEMA Flood Response Reports,6.5260,3.2620,flood_prone
+11,Makoko Waterfront,Lagos Mainland,Adelekan (2010) Environment & Urbanization,6.4965,3.3948,flood_prone
+12,Bariga Lowland,Shomolu,LASEMA Flood Response Reports,6.5368,3.3895,flood_prone
+13,Somolu / Pedro Corridor,Shomolu,LASEMA Flood Response Reports,6.5408,3.3712,flood_prone
+14,Apapa Warehouse District,Apapa,NIHSA Annual Flood Outlook,6.4485,3.3650,flood_prone
+15,Ijora-Olopa,Lagos Mainland,Adelekan (2010) Environment & Urbanization,6.4680,3.3695,flood_prone
+16,Isolo Canal Corridor,Oshodi-Isolo,LASEMA Flood Response Reports,6.5305,3.3228,flood_prone
+17,Iyana-Ipaja,Alimosho,LASEMA Flood Response Reports,6.6110,3.3082,flood_prone
+18,Agege Canal / Oke-Koto,Agege,NIHSA Annual Flood Outlook,6.6215,3.3248,flood_prone
+19,Ogudu / Ojota Creek,Kosofe,NIHSA Annual Flood Outlook & LASEMA,6.5790,3.3960,flood_prone
+20,Festac Town Canal,Amuwo-Odofin,LASEMA Flood Response Reports,6.4665,3.2835,flood_prone
+21,Oworonshoki Waterfront,Kosofe,LASEMA & Nkwunonwo et al. (2016),6.5480,3.4055,flood_prone
+22,Itire / Lawanson,Surulere,World Bank LMDGP,6.5080,3.3480,flood_prone
+23,Ikoyi Dolphin Estate,Eti-Osa,Nkwunonwo et al. (2016) NHESS,6.4545,3.4345,flood_prone
+24,Ajah / Langbasa Creek,Eti-Osa,LASEMA Flood Response Reports,6.4690,3.5710,flood_prone
+25,Ikorodu Town / Ebute,Ikorodu,NIHSA Annual Flood Outlook,6.6190,3.5105,flood_prone
+26,Ikeja GRA,Ikeja,Terrain upland control (this study),6.5855,3.3485,dry_control
+27,Maryland West Upland,Ikeja,Terrain upland control (this study),6.5710,3.3610,dry_control
+28,Magodo GRA Phase 2,Kosofe,Terrain upland control (this study),6.6185,3.3755,dry_control
+29,Magodo North Ridge,Kosofe,Terrain upland control (this study),6.6200,3.3800,dry_control
+30,Omole Phase 1,Ikeja,Terrain upland control (this study),6.6360,3.3620,dry_control
+31,Ifako Upland,Ifako-Ijaiye,Terrain upland control (this study),6.6450,3.3250,dry_control
+32,Akoka Campus Upland,Lagos Mainland,Terrain upland control (this study),6.5200,3.3970,dry_control
+33,Ikeja NAD Upland,Ikeja,Terrain upland control (this study),6.5900,3.3400,dry_control
+34,Lekki Conservation Centre Dune,Eti-Osa,Terrain upland control (this study),6.4390,3.5340,dry_control
+35,VGC / Ikota Upland,Eti-Osa,Terrain upland control (this study),6.4375,3.5500,dry_control
+36,Abijo East Upland,Ibeju-Lekki,Terrain upland control (this study),6.4980,3.6700,dry_control
+37,Lekki-Epe Expressway Tree Cover,Ibeju-Lekki,Terrain upland control (this study),6.5000,3.6400,dry_control
+38,Epe North Ridge,Epe,Terrain upland control (this study),6.5950,3.9900,dry_control
+39,Ikorodu GRA / Igbogbo Ridge,Ikorodu,Terrain upland control (this study),6.6500,3.5200,dry_control
+40,Ikorodu GRA East,Ikorodu,Terrain upland control (this study),6.6550,3.5150,dry_control

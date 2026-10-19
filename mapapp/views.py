@@ -1,47 +1,22 @@
-"""Views for the Lagos Flood Susceptibility Map web application and point query API."""
+"""Views for the Lagos Flood Susceptibility Map web application and APIs."""
 from __future__ import annotations
 
-from functools import lru_cache
 import json
-import math
+from functools import lru_cache
 from typing import Any
 
 from django.http import HttpRequest, JsonResponse
 from django.shortcuts import render
-from pyproj import Transformer
-import rasterio
-from rasterio.windows import Window
+import requests
 
 from pipeline.config import (
-    DEM_NODATA,
-    DEM_UTM31N_PATH,
-    DIST_DRAINAGE_UTM31N_PATH,
-    HAND_UTM31N_PATH,
     LAGOS_BBOX_WGS84,
-    RISK_CLASS_LABELS,
+    PLACES_GAZETTEER_PATH,
+    REQUIRED_WEB_RASTERS,
     RISK_METADATA_JSON_PATH,
-    RISK_UTM31N_PATH,
-    SLOPE_UTM31N_PATH,
-    UTM_CRS,
-    WBM_UTM31N_PATH,
-    WGS84_CRS,
+    VALIDATION_INPUT_CSV_PATH,
 )
-
-# Explicit coordinate transformer from EPSG:4326 (lon, lat) to EPSG:32631 (easting, northing in meters).
-WGS84_TO_UTM31N = Transformer.from_crs(WGS84_CRS, UTM_CRS, always_xy=True)
-
-
-@lru_cache(maxsize=1)
-def get_raster_datasets() -> dict[str, rasterio.DatasetReader]:
-    """Keep read-only rasterio handles open for fast point queries."""
-    return {
-        "dem": rasterio.open(DEM_UTM31N_PATH),
-        "hand": rasterio.open(HAND_UTM31N_PATH),
-        "dist": rasterio.open(DIST_DRAINAGE_UTM31N_PATH),
-        "slope": rasterio.open(SLOPE_UTM31N_PATH),
-        "risk": rasterio.open(RISK_UTM31N_PATH),
-        "wbm": rasterio.open(WBM_UTM31N_PATH),
-    }
+from pipeline.sample import sample_point
 
 
 def load_overlay_metadata() -> dict[str, Any]:
@@ -61,115 +36,6 @@ def index(request: HttpRequest):
         "overlay_metadata_json": json.dumps(meta),
     }
     return render(request, "mapapp/index.html", context)
-
-
-def query_point_rasters(lat: float, lon: float) -> dict[str, Any]:
-    """Convert WGS84 lat/lon to EPSG:32631 and sample elevation, HAND, distance to drainage, slope, and risk."""
-    easting_m, northing_m = WGS84_TO_UTM31N.transform(lon, lat)
-    datasets = get_raster_datasets()
-    dem_ds = datasets["dem"]
-    bounds = dem_ds.bounds
-
-    if not (bounds.left <= easting_m < bounds.right and bounds.bottom <= northing_m < bounds.top):
-        return {
-            "status": "out_of_bounds",
-            "in_bounds": False,
-            "is_water": False,
-            "lat": round(lat, 6),
-            "lon": round(lon, 6),
-            "utm_easting_m": round(easting_m, 1),
-            "utm_northing_m": round(northing_m, 1),
-            "crs": UTM_CRS,
-            "elevation": None,
-            "hand": None,
-            "distance_to_drainage": None,
-            "slope_deg": None,
-            "risk_class": "Out of Bounds",
-            "risk_code": None,
-            "message": "Point lies outside the Lagos study area bounding box (lon 3.0–4.0°E, lat 6.3–6.8°N).",
-        }
-
-    row, col = dem_ds.index(easting_m, northing_m)
-    if row < 0 or row >= dem_ds.height or col < 0 or col >= dem_ds.width:
-        return {
-            "status": "out_of_bounds",
-            "in_bounds": False,
-            "is_water": False,
-            "lat": round(lat, 6),
-            "lon": round(lon, 6),
-            "utm_easting_m": round(easting_m, 1),
-            "utm_northing_m": round(northing_m, 1),
-            "crs": UTM_CRS,
-            "elevation": None,
-            "hand": None,
-            "distance_to_drainage": None,
-            "slope_deg": None,
-            "risk_class": "Out of Bounds",
-            "risk_code": None,
-            "message": "Point lies outside the raster grid extent.",
-        }
-
-    win = Window(col, row, 1, 1)
-    elev_val = float(datasets["dem"].read(1, window=win)[0, 0])
-    hand_val = float(datasets["hand"].read(1, window=win)[0, 0])
-    dist_val = float(datasets["dist"].read(1, window=win)[0, 0])
-    slope_val = float(datasets["slope"].read(1, window=win)[0, 0])
-    risk_code = int(datasets["risk"].read(1, window=win)[0, 0])
-    wbm_code = int(datasets["wbm"].read(1, window=win)[0, 0])
-
-    is_open_water = wbm_code in (1, 2)
-    is_nodata = (
-        risk_code == 0
-        or hand_val == DEM_NODATA
-        or dist_val == DEM_NODATA
-        or not math.isfinite(hand_val)
-    )
-
-    if is_open_water or is_nodata:
-        if wbm_code == 1:
-            water_label = "Lagos Lagoon / Tidal Water" if lat > 6.43 else "Atlantic Ocean"
-        elif wbm_code == 2:
-            water_label = "Inland Lagoon / Lake"
-        else:
-            water_label = "NoData"
-        elev_clean = round(elev_val, 2) if (elev_val != DEM_NODATA and math.isfinite(elev_val)) else 0.0
-        return {
-            "status": "water_or_nodata",
-            "in_bounds": True,
-            "is_water": True,
-            "water_body": water_label,
-            "lat": round(lat, 6),
-            "lon": round(lon, 6),
-            "utm_easting_m": round(easting_m, 1),
-            "utm_northing_m": round(northing_m, 1),
-            "crs": UTM_CRS,
-            "elevation": elev_clean,
-            "hand": None,
-            "distance_to_drainage": 0.0,
-            "slope_deg": 0.0,
-            "risk_class": "Water / NoData",
-            "risk_code": 0,
-            "message": f"Permanent water body ({water_label}). HAND runoff susceptibility applies to land cells.",
-        }
-
-    risk_label = RISK_CLASS_LABELS.get(risk_code, "Unknown")
-    return {
-        "status": "ok",
-        "in_bounds": True,
-        "is_water": False,
-        "lat": round(lat, 6),
-        "lon": round(lon, 6),
-        "utm_easting_m": round(easting_m, 1),
-        "utm_northing_m": round(northing_m, 1),
-        "crs": UTM_CRS,
-        "elevation": round(elev_val, 2),
-        "hand": round(hand_val, 2),
-        "distance_to_drainage": round(dist_val, 1),
-        "slope_deg": round(slope_val, 2),
-        "risk_class": risk_label,
-        "risk_code": risk_code,
-        "message": f"{risk_label} flood susceptibility (HAND = {hand_val:.2f} m, drainage distance = {dist_val:.0f} m).",
-    }
 
 
 def point_query(request: HttpRequest) -> JsonResponse:
@@ -197,9 +63,117 @@ def point_query(request: HttpRequest) -> JsonResponse:
             status=400,
         )
 
-    result = query_point_rasters(lat=lat, lon=lon)
+    try:
+        result = sample_point(lat=lat, lon=lon)
+    except FileNotFoundError as exc:
+        return JsonResponse({"status": "error", "message": str(exc)}, status=503)
     return JsonResponse(result)
 
 
 def health_check(request: HttpRequest) -> JsonResponse:
-    return JsonResponse({"status": "ok", "project": "Lagos Flood Susceptibility Map"})
+    missing = [path.name for path in REQUIRED_WEB_RASTERS if not path.exists()]
+    payload = {
+        "status": "ok" if not missing else "degraded",
+        "project": "Lagos Flood Susceptibility Map",
+        "missing_rasters": missing,
+    }
+    return JsonResponse(payload, status=200 if not missing else 503)
+
+
+@lru_cache(maxsize=1)
+def load_gazetteer() -> list[dict[str, Any]]:
+    if not PLACES_GAZETTEER_PATH.exists():
+        return []
+    with open(PLACES_GAZETTEER_PATH, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+def _gazetteer_search(query: str) -> list[dict[str, Any]]:
+    needle = query.strip().lower()
+    hits: list[dict[str, Any]] = []
+    for place in load_gazetteer():
+        name = str(place.get("name", ""))
+        lga = str(place.get("lga", ""))
+        if needle in name.lower() or needle in lga.lower():
+            hits.append(
+                {
+                    "name": name,
+                    "lat": place["lat"],
+                    "lon": place["lon"],
+                    "kind": place.get("kind", "place"),
+                    "lga": lga,
+                    "source": "gazetteer",
+                }
+            )
+    return hits
+
+
+def _nominatim_search(query: str) -> list[dict[str, Any]]:
+    min_lon, min_lat, max_lon, max_lat = LAGOS_BBOX_WGS84
+    response = requests.get(
+        "https://nominatim.openstreetmap.org/search",
+        params={
+            "q": query,
+            "format": "json",
+            "limit": 5,
+            "viewbox": f"{min_lon},{max_lat},{max_lon},{min_lat}",
+            "bounded": 1,
+        },
+        headers={"User-Agent": "LagosFloodSusceptibilityMap/1.0"},
+        timeout=8,
+    )
+    response.raise_for_status()
+    hits = []
+    for item in response.json():
+        hits.append(
+            {
+                "name": item.get("display_name", query),
+                "lat": float(item["lat"]),
+                "lon": float(item["lon"]),
+                "kind": item.get("type", "nominatim"),
+                "lga": "",
+                "source": "nominatim",
+            }
+        )
+    return hits
+
+
+def search_places(request: HttpRequest) -> JsonResponse:
+    query = (request.GET.get("q") or "").strip()
+    if len(query) < 2:
+        return JsonResponse({"results": []})
+
+    results = _gazetteer_search(query)
+    if len(results) < 3:
+        try:
+            for hit in _nominatim_search(query):
+                if not any(
+                    abs(hit["lat"] - existing["lat"]) < 1e-4 and abs(hit["lon"] - existing["lon"]) < 1e-4
+                    for existing in results
+                ):
+                    results.append(hit)
+        except (requests.RequestException, ValueError, KeyError):
+            pass
+    return JsonResponse({"results": results[:8]})
+
+
+def validation_points(request: HttpRequest) -> JsonResponse:
+    if not VALIDATION_INPUT_CSV_PATH.exists():
+        return JsonResponse({"points": []})
+    import csv
+
+    points = []
+    with open(VALIDATION_INPUT_CSV_PATH, "r", encoding="utf-8") as f:
+        for row in csv.DictReader(f):
+            points.append(
+                {
+                    "id": row.get("id"),
+                    "name": row.get("name"),
+                    "lga": row.get("lga"),
+                    "site_type": row.get("site_type", "flood_prone"),
+                    "lat": float(row["lat"]),
+                    "lon": float(row["lon"]),
+                    "source": row.get("source", ""),
+                }
+            )
+    return JsonResponse({"points": points})

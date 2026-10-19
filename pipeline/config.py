@@ -52,11 +52,23 @@ HYDROLOGY_PNG_PATH = OUTPUTS_DIR / "lagos_hydrology.png"
 OSM_WATERWAYS_TAGS = {"waterway": ["river", "canal", "stream", "drain", "ditch"]}
 OSM_WATERWAYS_WGS84_PATH = RAW_DIR / "osm_waterways_wgs84.geojson"
 OSM_WATERWAYS_UTM31N_PATH = PROCESSED_DIR / "osm_waterways_utm31n.geojson"
+REFERENCE_DIR = DATA_DIR / "reference"
+SYSTEM_CANALS_PATH = REFERENCE_DIR / "lagos_system_canals.geojson"
+LAGOS_LGAS_PATH = REFERENCE_DIR / "lagos_lgas.geojson"
+PLACES_GAZETTEER_PATH = REFERENCE_DIR / "places.json"
 DRAINAGE_TARGET_UTM31N_PATH = PROCESSED_DIR / "drainage_target_utm31n.tif"
 HAND_UTM31N_PATH = PROCESSED_DIR / "hand_utm31n.tif"
 DIST_DRAINAGE_UTM31N_PATH = PROCESSED_DIR / "dist_to_drainage_utm31n.tif"
 SLOPE_UTM31N_PATH = PROCESSED_DIR / "slope_deg_utm31n.tif"
 HAND_PNG_PATH = OUTPUTS_DIR / "lagos_hand_distance_slope.png"
+
+# Milestone 5: ESA WorldCover land cover, distance to open water, LGA overlay.
+WORLDCOVER_S3_BASE_URL = "https://esa-worldcover.s3.eu-central-1.amazonaws.com/v200/2021/map"
+WORLDCOVER_TILES = ["ESA_WorldCover_10m_2021_v200_N06E003_Map"]
+WORLDCOVER_UTM31N_PATH = PROCESSED_DIR / "worldcover_utm31n.tif"
+DIST_OPEN_WATER_UTM31N_PATH = PROCESSED_DIR / "dist_open_water_utm31n.tif"
+CONTEXT_PNG_PATH = OUTPUTS_DIR / "lagos_landcover_coastal.png"
+LAGOS_LGAS_WGS84_PATH = OUTPUTS_DIR / "lagos_lgas_wgs84.geojson"
 
 # Milestone 4 Risk Classification Configuration (all thresholds in metric / degree units).
 # Primary factor: Height Above Nearest Drainage (HAND) in meters.
@@ -71,10 +83,21 @@ DIST_MEDIUM_MAX_M = 600.0  # 300 - 600 m from channel/canal: moderate proximity 
 SLOPE_FLAT_MAX_DEG = 1.5      # <= 1.5 deg: flat terrain prone to surface water ponding
 SLOPE_MODERATE_MAX_DEG = 3.0  # 1.5 - 3.0 deg: gentle slope with slow overland drainage
 
-# Factor weights for composite susceptibility score (sum = 1.00, HAND is primary).
-WEIGHT_HAND = 0.60
-WEIGHT_DIST = 0.25
-WEIGHT_SLOPE = 0.15
+# Secondary factor 3: ESA WorldCover land cover used as an impervious/runoff proxy.
+# 50 = built-up (high), 40/60 = cropland or bare (medium), other terrestrial = low.
+IMPERVIOUS_HIGH_CLASSES = (50,)
+IMPERVIOUS_MEDIUM_CLASSES = (40, 60)
+
+# Coastal / lagoon inundation: elevation above open water, applied within this radius.
+COASTAL_INFLUENCE_M = 2000.0
+COASTAL_HIGH_MAX_M = 2.0
+COASTAL_MEDIUM_MAX_M = 5.0
+
+# Runoff-composite weights (sum = 1.00). Coastal is combined with max(), not a fifth weight.
+WEIGHT_HAND = 0.45
+WEIGHT_DIST = 0.20
+WEIGHT_SLOPE = 0.10
+WEIGHT_IMPERVIOUS = 0.25
 
 # Composite score cutoffs on the [1.0, 3.0] scale.
 RISK_SCORE_HIGH_MIN = 2.40
@@ -103,10 +126,26 @@ RISK_CLASS_COLORS_RGBA = {
 
 RISK_UTM31N_PATH = PROCESSED_DIR / "risk_class_utm31n.tif"
 RISK_WGS84_PATH = PROCESSED_DIR / "risk_class_wgs84.tif"
+RISK_SCORE_UTM31N_PATH = PROCESSED_DIR / "risk_score_utm31n.tif"
 RISK_OVERLAY_PNG_PATH = OUTPUTS_DIR / "risk_overlay_wgs84.png"
+RISK_OVERLAY_HIGH_PNG_PATH = OUTPUTS_DIR / "risk_overlay_high_wgs84.png"
+RISK_OVERLAY_MEDIUM_PNG_PATH = OUTPUTS_DIR / "risk_overlay_medium_wgs84.png"
+RISK_OVERLAY_LOW_PNG_PATH = OUTPUTS_DIR / "risk_overlay_low_wgs84.png"
+SCORE_OVERLAY_PNG_PATH = OUTPUTS_DIR / "score_overlay_wgs84.png"
 RISK_ZONES_GEOJSON_PATH = OUTPUTS_DIR / "risk_zones_wgs84.geojson"
 RISK_METADATA_JSON_PATH = OUTPUTS_DIR / "overlay_metadata.json"
 RISK_MAP_PNG_PATH = OUTPUTS_DIR / "lagos_risk_map.png"
+
+REQUIRED_WEB_RASTERS = (
+    DEM_UTM31N_PATH,
+    HAND_UTM31N_PATH,
+    DIST_DRAINAGE_UTM31N_PATH,
+    SLOPE_UTM31N_PATH,
+    RISK_UTM31N_PATH,
+    WBM_UTM31N_PATH,
+    WORLDCOVER_UTM31N_PATH,
+    DIST_OPEN_WATER_UTM31N_PATH,
+)
 
 # Milestone 6 Validation paths.
 VALIDATION_INPUT_CSV_PATH = DATA_DIR / "validation_points.csv"

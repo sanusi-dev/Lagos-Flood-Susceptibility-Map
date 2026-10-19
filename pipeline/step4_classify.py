@@ -18,14 +18,18 @@ from rasterio.enums import Resampling
 from rasterio.features import shapes
 from rasterio.transform import from_bounds
 from rasterio.warp import reproject
-from scipy.ndimage import zoom
 from shapely.geometry import shape
 
 from pipeline.config import (
+    COASTAL_HIGH_MAX_M,
+    COASTAL_INFLUENCE_M,
+    COASTAL_MEDIUM_MAX_M,
     DEM_NODATA,
+    DEM_UTM31N_PATH,
     DIST_DRAINAGE_UTM31N_PATH,
     DIST_HIGH_MAX_M,
     DIST_MEDIUM_MAX_M,
+    DIST_OPEN_WATER_UTM31N_PATH,
     HAND_HIGH_MAX_M,
     HAND_MEDIUM_MAX_M,
     HAND_UTM31N_PATH,
@@ -39,12 +43,17 @@ from pipeline.config import (
     RISK_CLASS_NODATA,
     RISK_MAP_PNG_PATH,
     RISK_METADATA_JSON_PATH,
+    RISK_OVERLAY_HIGH_PNG_PATH,
+    RISK_OVERLAY_LOW_PNG_PATH,
+    RISK_OVERLAY_MEDIUM_PNG_PATH,
     RISK_OVERLAY_PNG_PATH,
     RISK_SCORE_HIGH_MIN,
     RISK_SCORE_MEDIUM_MIN,
+    RISK_SCORE_UTM31N_PATH,
     RISK_UTM31N_PATH,
     RISK_WGS84_PATH,
     RISK_ZONES_GEOJSON_PATH,
+    SCORE_OVERLAY_PNG_PATH,
     SLOPE_FLAT_MAX_DEG,
     SLOPE_MODERATE_MAX_DEG,
     SLOPE_UTM31N_PATH,
@@ -53,60 +62,34 @@ from pipeline.config import (
     WBM_UTM31N_PATH,
     WEIGHT_DIST,
     WEIGHT_HAND,
+    WEIGHT_IMPERVIOUS,
     WEIGHT_SLOPE,
     WGS84_CRS,
+    WORLDCOVER_UTM31N_PATH,
 )
-
-
-def compute_risk_classes(
-    hand: np.ndarray,
-    dist: np.ndarray,
-    slope: np.ndarray,
-    valid_land: np.ndarray,
-) -> np.ndarray:
-    """Combine HAND (primary), distance to drainage, and slope into discrete 0/1/2/3 classes."""
-    # Sub-score 1: HAND (primary indicator of vertical proximity to drainage water level).
-    hand_score = np.ones_like(hand, dtype=np.float32)
-    hand_score = np.where(hand <= HAND_MEDIUM_MAX_M, 2.0, hand_score)
-    hand_score = np.where(hand <= HAND_HIGH_MAX_M, 3.0, hand_score)
-
-    # Sub-score 2: Euclidean distance to nearest drainage channel or OSM waterway in meters.
-    dist_score = np.ones_like(dist, dtype=np.float32)
-    dist_score = np.where(dist <= DIST_MEDIUM_MAX_M, 2.0, dist_score)
-    dist_score = np.where(dist <= DIST_HIGH_MAX_M, 3.0, dist_score)
-
-    # Sub-score 3: Terrain slope in degrees (flat cells pond overland runoff).
-    slope_score = np.ones_like(slope, dtype=np.float32)
-    slope_score = np.where(slope <= SLOPE_MODERATE_MAX_DEG, 2.0, slope_score)
-    slope_score = np.where(slope <= SLOPE_FLAT_MAX_DEG, 3.0, slope_score)
-
-    composite = (
-        WEIGHT_HAND * hand_score
-        + WEIGHT_DIST * dist_score
-        + WEIGHT_SLOPE * slope_score
-    )
-
-    risk = np.full(hand.shape, RISK_CLASS_NODATA, dtype=np.uint8)
-    risk = np.where(valid_land, RISK_CLASS_LOW, risk)
-    risk = np.where(valid_land & (composite >= RISK_SCORE_MEDIUM_MIN), RISK_CLASS_MEDIUM, risk)
-    risk = np.where(valid_land & (composite >= RISK_SCORE_HIGH_MIN), RISK_CLASS_HIGH, risk)
-    return risk
+from pipeline.scoring import compute_risk_rasters
 
 
 def classify_rasters(force: bool = False) -> tuple[Path, Path]:
     """Generate classified GeoTIFF in EPSG:32631 and warp to EPSG:4326 for web overlay alignment."""
-    if RISK_UTM31N_PATH.exists() and RISK_WGS84_PATH.exists() and not force:
+    if RISK_UTM31N_PATH.exists() and RISK_WGS84_PATH.exists() and RISK_SCORE_UTM31N_PATH.exists() and not force:
         print(f"[cache] Using existing classified risk rasters: {RISK_UTM31N_PATH}")
         return RISK_UTM31N_PATH, RISK_WGS84_PATH
 
     with rasterio.open(HAND_UTM31N_PATH) as hand_src, \
          rasterio.open(DIST_DRAINAGE_UTM31N_PATH) as dist_src, \
          rasterio.open(SLOPE_UTM31N_PATH) as slp_src, \
-         rasterio.open(WBM_UTM31N_PATH) as wbm_src:
+         rasterio.open(WBM_UTM31N_PATH) as wbm_src, \
+         rasterio.open(WORLDCOVER_UTM31N_PATH) as cover_src, \
+         rasterio.open(DEM_UTM31N_PATH) as dem_src, \
+         rasterio.open(DIST_OPEN_WATER_UTM31N_PATH) as dow_src:
         hand = hand_src.read(1)
         dist = dist_src.read(1)
         slope = slp_src.read(1)
         wbm = wbm_src.read(1)
+        worldcover = cover_src.read(1)
+        elevation = dem_src.read(1)
+        dist_open_water = dow_src.read(1)
         utm_profile = hand_src.profile.copy()
         utm_transform = hand_src.transform
         utm_crs = hand_src.crs
@@ -123,12 +106,21 @@ def classify_rasters(force: bool = False) -> tuple[Path, Path]:
         & np.isfinite(slope)
     )
 
-    risk_utm = compute_risk_classes(hand, dist, slope, valid_land)
+    risk_utm, score_utm, _factors = compute_risk_rasters(
+        hand, dist, slope, worldcover, elevation, dist_open_water, valid_land
+    )
 
     utm_profile.update(dtype="uint8", nodata=RISK_CLASS_NODATA, compress="deflate")
     with rasterio.open(RISK_UTM31N_PATH, "w", **utm_profile) as dst:
         dst.write(risk_utm, 1)
     print(f"[process] Saved classified risk GeoTIFF (EPSG:32631): {RISK_UTM31N_PATH}")
+
+    score_profile = utm_profile.copy()
+    score_profile.update(dtype="float32", nodata=DEM_NODATA, compress="deflate")
+    score_out = np.where(np.isfinite(score_utm), score_utm, DEM_NODATA).astype(np.float32)
+    with rasterio.open(RISK_SCORE_UTM31N_PATH, "w", **score_profile) as dst:
+        dst.write(score_out, 1)
+    print(f"[process] Saved continuous score GeoTIFF (EPSG:32631): {RISK_SCORE_UTM31N_PATH}")
 
     # Warp the classified raster to EPSG:4326 using nearest-neighbor resampling.
     # Reason: Leaflet L.imageOverlay expects a lat/lon aligned image; nearest-neighbor
@@ -173,6 +165,8 @@ def export_web_overlay_and_vectors(force: bool = False) -> tuple[Path, Path, Pat
     """Export transparent RGBA PNG overlay, generalized GeoJSON vector polygons, and metadata JSON."""
     if (
         RISK_OVERLAY_PNG_PATH.exists()
+        and RISK_OVERLAY_HIGH_PNG_PATH.exists()
+        and SCORE_OVERLAY_PNG_PATH.exists()
         and RISK_ZONES_GEOJSON_PATH.exists()
         and RISK_METADATA_JSON_PATH.exists()
         and not force
@@ -194,6 +188,45 @@ def export_web_overlay_and_vectors(force: bool = False) -> tuple[Path, Path, Pat
     img = Image.fromarray(rgba, mode="RGBA")
     img.save(RISK_OVERLAY_PNG_PATH, format="PNG", optimize=True)
     print(f"[process] Saved transparent RGBA web map overlay: {RISK_OVERLAY_PNG_PATH}")
+
+    class_overlay_paths = {
+        RISK_CLASS_HIGH: RISK_OVERLAY_HIGH_PNG_PATH,
+        RISK_CLASS_MEDIUM: RISK_OVERLAY_MEDIUM_PNG_PATH,
+        RISK_CLASS_LOW: RISK_OVERLAY_LOW_PNG_PATH,
+    }
+    for class_id, path in class_overlay_paths.items():
+        class_rgba = np.zeros_like(rgba)
+        mask = risk_wgs84 == class_id
+        class_rgba[mask] = RISK_CLASS_COLORS_RGBA[class_id]
+        Image.fromarray(class_rgba, mode="RGBA").save(path, format="PNG", optimize=True)
+        print(f"[process] Saved class overlay: {path}")
+
+    with rasterio.open(RISK_SCORE_UTM31N_PATH) as score_src:
+        score_utm = score_src.read(1)
+        score_nodata = score_src.nodata
+        score_wgs84 = np.full(risk_wgs84.shape, np.nan, dtype=np.float32)
+        reproject(
+            source=score_utm,
+            destination=score_wgs84,
+            src_transform=score_src.transform,
+            src_crs=score_src.crs,
+            src_nodata=score_nodata,
+            dst_transform=transform,
+            dst_crs=CRS.from_string(WGS84_CRS),
+            dst_nodata=np.nan,
+            resampling=Resampling.bilinear,
+        )
+    cmap = plt.get_cmap("RdYlGn_r")
+    finite = np.isfinite(score_wgs84) & (risk_wgs84 > 0)
+    norm = np.clip((score_wgs84 - 1.0) / 2.0, 0.0, 1.0)
+    score_rgba = np.zeros((risk_wgs84.shape[0], risk_wgs84.shape[1], 4), dtype=np.uint8)
+    colored = (np.asarray(cmap(norm)) * 255.0).astype(np.uint8)
+    score_rgba[finite] = colored[finite]
+    score_rgba[finite, 3] = 185
+    score_img = Image.fromarray(score_rgba, mode="RGBA")
+    score_img = score_img.resize((max(1, score_img.width // 2), max(1, score_img.height // 2)), Image.BILINEAR)
+    score_img.save(SCORE_OVERLAY_PNG_PATH, format="PNG", optimize=True)
+    print(f"[process] Saved continuous score overlay: {SCORE_OVERLAY_PNG_PATH}")
 
     # Export a generalized vector polygon GeoJSON (downsampled 8x using nearest-neighbor)
     # so vector inspection tools can load risk zones without a 500MB polygon file.
@@ -239,15 +272,29 @@ def export_web_overlay_and_vectors(force: bool = False) -> tuple[Path, Path, Pat
             "dist_medium_max_m": DIST_MEDIUM_MAX_M,
             "slope_flat_max_deg": SLOPE_FLAT_MAX_DEG,
             "slope_moderate_max_deg": SLOPE_MODERATE_MAX_DEG,
+            "coastal_high_max_m": COASTAL_HIGH_MAX_M,
+            "coastal_medium_max_m": COASTAL_MEDIUM_MAX_M,
+            "coastal_influence_m": COASTAL_INFLUENCE_M,
             "weights": {
                 "hand": WEIGHT_HAND,
                 "distance_to_drainage": WEIGHT_DIST,
                 "slope": WEIGHT_SLOPE,
+                "impervious": WEIGHT_IMPERVIOUS,
             },
             "score_cutoffs": {
                 "high_min": RISK_SCORE_HIGH_MIN,
                 "medium_min": RISK_SCORE_MEDIUM_MIN,
             },
+            "combine": "max(runoff_weighted, coastal) within 2 km of open water",
+        },
+        "overlays": {
+            "classified": "/static/risk_overlay_wgs84.png",
+            "high": "/static/risk_overlay_high_wgs84.png",
+            "medium": "/static/risk_overlay_medium_wgs84.png",
+            "low": "/static/risk_overlay_low_wgs84.png",
+            "score": "/static/score_overlay_wgs84.png",
+            "lgas": "/static/lagos_lgas_wgs84.geojson",
+            "streams": "/static/streams_wgs84.geojson",
         },
         "classes": {
             "1": {
@@ -377,7 +424,11 @@ def print_summary() -> None:
         f"Dist High <= {DIST_HIGH_MAX_M:.0f}m, Medium <= {DIST_MEDIUM_MAX_M:.0f}m | "
         f"Slope Flat <= {SLOPE_FLAT_MAX_DEG}°, Mod <= {SLOPE_MODERATE_MAX_DEG}°"
     )
-    print(f"Weights        : HAND={WEIGHT_HAND:.2f}, Distance={WEIGHT_DIST:.2f}, Slope={WEIGHT_SLOPE:.2f}")
+    print(
+        f"Weights        : HAND={WEIGHT_HAND:.2f}, Distance={WEIGHT_DIST:.2f}, "
+        f"Slope={WEIGHT_SLOPE:.2f}, Impervious={WEIGHT_IMPERVIOUS:.2f} "
+        f"(coastal via max() within {COASTAL_INFLUENCE_M:.0f} m)"
+    )
     print(f"High (3)       : {c3['land_cells']:,} cells ({c3['land_area_km2']} km², {c3['land_share_pct']}% of land)")
     print(f"Medium (2)     : {c2['land_cells']:,} cells ({c2['land_area_km2']} km², {c2['land_share_pct']}% of land)")
     print(f"Low (1)        : {c1['land_cells']:,} cells ({c1['land_area_km2']} km², {c1['land_share_pct']}% of land)")
@@ -397,4 +448,9 @@ def run_step4(force: bool = False) -> None:
 
 
 if __name__ == "__main__":
-    run_step4()
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Classify flood susceptibility and export overlays.")
+    parser.add_argument("--force", action="store_true")
+    args = parser.parse_args()
+    run_step4(force=args.force)

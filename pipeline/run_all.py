@@ -1,4 +1,4 @@
-"""Run all GIS pipeline milestones (Steps 1 through 4 and Step 6 validation) in sequence."""
+"""Run all GIS pipeline milestones in sequence."""
 from __future__ import annotations
 
 import argparse
@@ -7,6 +7,7 @@ from pipeline.step1_dem import run_step1
 from pipeline.step2_hydrology import run_step2
 from pipeline.step3_hand import run_step3
 from pipeline.step4_classify import run_step4
+from pipeline.step5_context import run_step5
 from pipeline.step6_validate import evaluate_points_csv
 
 
@@ -18,6 +19,7 @@ def main() -> None:
     run_step1(force=args.force)
     run_step2(force=args.force)
     run_step3(force=args.force)
+    run_step5(force=args.force)
     run_step4(force=args.force)
     evaluate_points_csv()
 

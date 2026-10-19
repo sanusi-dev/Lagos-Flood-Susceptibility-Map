@@ -267,6 +267,103 @@
       border-left: 3px solid var(--accent-cyan);
     }
 
+    .inspector-message.is-error {
+      border-left-color: var(--risk-high);
+      color: #fecaca;
+    }
+
+    .search-wrap {
+      position: relative;
+    }
+
+    #place-search {
+      width: 100%;
+      background: var(--bg-card);
+      color: var(--text-primary);
+      border: 1px solid var(--border-hairline);
+      border-radius: 4px;
+      padding: 8px 10px;
+      font-size: 13px;
+    }
+
+    #place-search:focus {
+      outline: 1px solid var(--accent-cyan);
+    }
+
+    .search-results {
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 100%;
+      z-index: 600;
+      background: var(--bg-card-elev);
+      border: 1px solid var(--border-hairline);
+      border-radius: 4px;
+      margin-top: 4px;
+      display: none;
+      max-height: 220px;
+      overflow-y: auto;
+    }
+
+    .search-results button {
+      display: block;
+      width: 100%;
+      text-align: left;
+      background: transparent;
+      color: var(--text-primary);
+      border: none;
+      padding: 8px 10px;
+      cursor: pointer;
+      font-size: 12.5px;
+    }
+
+    .search-results button:hover {
+      background: rgba(56, 189, 248, 0.12);
+    }
+
+    .search-results .hit-meta {
+      display: block;
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .factor-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-top: 10px;
+    }
+
+    .factor-row {
+      display: grid;
+      grid-template-columns: 92px 1fr 28px;
+      align-items: center;
+      gap: 8px;
+      font-size: 11.5px;
+    }
+
+    .factor-bar {
+      height: 7px;
+      background: #0b1524;
+      border: 1px solid var(--border-hairline);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+
+    .factor-bar > span {
+      display: block;
+      height: 100%;
+      width: 0%;
+      background: var(--accent-cyan);
+    }
+
+    .mode-row {
+      display: flex;
+      gap: 12px;
+      font-size: 12.5px;
+      margin-bottom: 10px;
+    }
+
     /* Preset Chips */
     .preset-grid {
       display: flex;
@@ -433,9 +530,17 @@
         <div class="eyebrow">Copernicus GLO-30 · EPSG:32631 (UTM 31N)</div>
         <h1 class="brand-title">Lagos Flood Susceptibility</h1>
         <p class="brand-note">
-          Terrain runoff accumulation model using Height Above Nearest Drainage (HAND), channel proximity, and slope. Susceptibility only, not a real-time flood forecast.
+          Terrain runoff plus coastal elevation and built-up land cover. Screening map only, not a real-time flood forecast.
         </p>
       </header>
+
+      <section class="panel-section">
+        <div class="section-title"><span>Place Search</span></div>
+        <div class="search-wrap">
+          <input id="place-search" type="search" placeholder="Ikeja, Surulere, Lekki…" autocomplete="off" />
+          <div class="search-results" id="search-results"></div>
+        </div>
+      </section>
 
       <section class="panel-section">
         <div class="section-title">
@@ -469,6 +574,22 @@
               <div class="metric-label">Terrain Slope</div>
               <div class="metric-value" id="val-slope">—</div>
             </div>
+            <div class="metric-box">
+              <div class="metric-label">Land Cover</div>
+              <div class="metric-value" id="val-cover">—</div>
+            </div>
+            <div class="metric-box">
+              <div class="metric-label">Composite Score</div>
+              <div class="metric-value" id="val-score">—</div>
+            </div>
+          </div>
+
+          <div class="factor-list">
+            <div class="factor-row"><span>HAND</span><div class="factor-bar"><span id="bar-hand"></span></div><span id="txt-hand-s">—</span></div>
+            <div class="factor-row"><span>Drainage</span><div class="factor-bar"><span id="bar-dist"></span></div><span id="txt-dist-s">—</span></div>
+            <div class="factor-row"><span>Slope</span><div class="factor-bar"><span id="bar-slope"></span></div><span id="txt-slope-s">—</span></div>
+            <div class="factor-row"><span>Built-up</span><div class="factor-bar"><span id="bar-imp"></span></div><span id="txt-imp-s">—</span></div>
+            <div class="factor-row"><span>Coastal</span><div class="factor-bar"><span id="bar-coast"></span></div><span id="txt-coast-s">—</span></div>
           </div>
 
           <div class="hand-gauge-wrap">
@@ -508,22 +629,38 @@
           <span>Layer Controls</span>
         </div>
 
+        <div class="mode-row">
+          <label><input type="radio" name="overlay-mode" value="classified" checked /> Classified</label>
+          <label><input type="radio" name="overlay-mode" value="score" /> Continuous score</label>
+        </div>
+
         <div class="control-row">
           <div class="slider-label">
-            <span>Susceptibility Overlay Opacity</span>
+            <span>Overlay Opacity</span>
             <span id="opacity-readout">72%</span>
           </div>
           <input id="opacity-slider" type="range" min="0" max="100" value="72" />
         </div>
 
-        <label class="toggle-label">
-          <input id="toggle-risk" type="checkbox" checked />
-          <span>Show Flood Susceptibility Raster</span>
-        </label>
+        <div class="control-row" id="class-filter-row">
+          <div class="slider-label">
+            <span>Minimum class to show</span>
+            <span id="class-filter-readout">Low</span>
+          </div>
+          <input id="class-filter" type="range" min="1" max="3" step="1" value="1" />
+        </div>
 
         <label class="toggle-label">
           <input id="toggle-streams" type="checkbox" />
-          <span>Show Extracted D8 Drainage Network (GeoJSON)</span>
+          <span>Drainage network</span>
+        </label>
+        <label class="toggle-label">
+          <input id="toggle-lgas" type="checkbox" />
+          <span>LGA boundaries</span>
+        </label>
+        <label class="toggle-label">
+          <input id="toggle-validation" type="checkbox" />
+          <span>Validation sites</span>
         </label>
       </section>
 
@@ -532,43 +669,7 @@
           <span>Susceptibility Legend (Land Area)</span>
         </div>
 
-        <div class="legend-list">
-          <div class="legend-item">
-            <span class="swatch" style="background: #e31a1c;"></span>
-            <div>
-              <span class="legend-desc">High Susceptibility</span>
-              <span class="legend-sub">HAND &le; 2.0 m, near channel (&le; 300 m), flat terrain</span>
-            </div>
-            <span class="legend-share">38.8%</span>
-          </div>
-
-          <div class="legend-item">
-            <span class="swatch" style="background: #feb24c;"></span>
-            <div>
-              <span class="legend-desc">Medium Susceptibility</span>
-              <span class="legend-sub">HAND 2.0–5.0 m, moderate distance (300–600 m)</span>
-            </div>
-            <span class="legend-share">17.9%</span>
-          </div>
-
-          <div class="legend-item">
-            <span class="swatch" style="background: #2ca25f;"></span>
-            <div>
-              <span class="legend-desc">Low Susceptibility</span>
-              <span class="legend-sub">HAND &gt; 5.0 m, upland interfluves &amp; steeper slopes</span>
-            </div>
-            <span class="legend-share">43.3%</span>
-          </div>
-
-          <div class="legend-item">
-            <span class="swatch" style="background: #38bdf8;"></span>
-            <div>
-              <span class="legend-desc">Permanent Water / Lagoon</span>
-              <span class="legend-sub">Lagos Lagoon, creeks &amp; Atlantic Ocean (WBM)</span>
-            </div>
-            <span class="legend-share">Water</span>
-          </div>
-        </div>
+        <div class="legend-list" id="legend-list"></div>
       </section>
     </aside>
 
@@ -582,6 +683,7 @@
   <script>
     const OVERLAY_META = {{ overlay_metadata_json|safe }};
     const bounds = OVERLAY_META.leaflet_bounds || [[6.3, 3.0], [6.8, 4.0]];
+    const overlays = OVERLAY_META.overlays || {};
 
     const map = L.map("map", {
       center: [6.525, 3.45],
@@ -591,15 +693,18 @@
 
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
       maxZoom: 18,
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors | Copernicus GLO-30 DEM'
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors | Copernicus GLO-30 DEM | ESA WorldCover 2021'
     }).addTo(map);
 
-    const riskOverlay = L.imageOverlay("/static/risk_overlay_wgs84.png", bounds, {
-      opacity: 0.72,
-      interactive: false
-    }).addTo(map);
+    const overlayOpacity = 0.72;
+    const highOverlay = L.imageOverlay(overlays.high || "/static/risk_overlay_high_wgs84.png", bounds, { opacity: overlayOpacity, interactive: false });
+    const medOverlay = L.imageOverlay(overlays.medium || "/static/risk_overlay_medium_wgs84.png", bounds, { opacity: overlayOpacity, interactive: false });
+    const lowOverlay = L.imageOverlay(overlays.low || "/static/risk_overlay_low_wgs84.png", bounds, { opacity: overlayOpacity, interactive: false });
+    const combinedOverlay = L.imageOverlay(overlays.classified || "/static/risk_overlay_wgs84.png", bounds, { opacity: overlayOpacity, interactive: false });
+    const scoreOverlay = L.imageOverlay(overlays.score || "/static/score_overlay_wgs84.png", bounds, { opacity: overlayOpacity, interactive: false });
+    const classOverlays = [lowOverlay, medOverlay, highOverlay];
+    combinedOverlay.addTo(map);
 
-    // Study area bounding box outline
     L.rectangle(bounds, {
       color: "#38bdf8",
       weight: 1.5,
@@ -609,45 +714,164 @@
     }).addTo(map);
 
     let streamsLayer = null;
+    let lgaLayer = null;
+    let validationLayer = null;
     let activeMarker = null;
+    let overlayMode = "classified";
 
-    const opacitySlider = document.getElementById("opacity-slider");
-    const opacityReadout = document.getElementById("opacity-readout");
-    const toggleRisk = document.getElementById("toggle-risk");
-    const toggleStreams = document.getElementById("toggle-streams");
+    function setOverlayOpacity(val) {
+      const opacity = val / 100.0;
+      [combinedOverlay, highOverlay, medOverlay, lowOverlay, scoreOverlay].forEach((layer) => layer.setOpacity(opacity));
+    }
 
-    opacitySlider.addEventListener("input", (e) => {
-      const val = Number(e.target.value);
-      opacityReadout.textContent = `${val}%`;
-      riskOverlay.setOpacity(val / 100.0);
-    });
-
-    toggleRisk.addEventListener("change", (e) => {
-      if (e.target.checked) {
-        riskOverlay.addTo(map);
-      } else {
-        map.removeLayer(riskOverlay);
+    function applyClassFilter(minClass) {
+      const labels = { 1: "Low", 2: "Medium", 3: "High" };
+      document.getElementById("class-filter-readout").textContent = labels[minClass] || "Low";
+      if (overlayMode !== "classified") {
+        return;
       }
+      map.removeLayer(scoreOverlay);
+      if (minClass <= 1) {
+        classOverlays.forEach((layer) => map.removeLayer(layer));
+        combinedOverlay.addTo(map);
+        return;
+      }
+      map.removeLayer(combinedOverlay);
+      const wanted = [
+        minClass <= 2 ? medOverlay : null,
+        highOverlay
+      ];
+      classOverlays.forEach((layer) => {
+        if (wanted.includes(layer)) {
+          layer.addTo(map);
+        } else {
+          map.removeLayer(layer);
+        }
+      });
+    }
+
+    function applyOverlayMode() {
+      const filterRow = document.getElementById("class-filter-row");
+      if (overlayMode === "score") {
+        filterRow.style.display = "none";
+        classOverlays.forEach((layer) => map.removeLayer(layer));
+        map.removeLayer(combinedOverlay);
+        scoreOverlay.addTo(map);
+      } else {
+        filterRow.style.display = "block";
+        map.removeLayer(scoreOverlay);
+        applyClassFilter(Number(document.getElementById("class-filter").value));
+      }
+    }
+
+    document.getElementById("opacity-slider").addEventListener("input", (e) => {
+      const val = Number(e.target.value);
+      document.getElementById("opacity-readout").textContent = `${val}%`;
+      setOverlayOpacity(val);
     });
 
-    toggleStreams.addEventListener("change", async (e) => {
-      if (e.target.checked) {
-        if (!streamsLayer) {
-          const resp = await fetch("/static/streams_wgs84.geojson");
-          const geojson = await resp.json();
-          streamsLayer = L.geoJSON(geojson, {
-            style: {
-              color: "#0284c7",
-              weight: 1.4,
-              opacity: 0.9
-            }
-          });
+    document.getElementById("class-filter").addEventListener("input", (e) => {
+      applyClassFilter(Number(e.target.value));
+    });
+
+    document.querySelectorAll("input[name='overlay-mode']").forEach((input) => {
+      input.addEventListener("change", (e) => {
+        overlayMode = e.target.value;
+        applyOverlayMode();
+      });
+    });
+
+    async function loadStreams() {
+      if (streamsLayer) return streamsLayer;
+      const resp = await fetch(overlays.streams || "/static/streams_wgs84.geojson");
+      if (!resp.ok) throw new Error("drainage GeoJSON missing");
+      streamsLayer = L.geoJSON(await resp.json(), {
+        style: { color: "#0284c7", weight: 1.4, opacity: 0.9 }
+      });
+      return streamsLayer;
+    }
+
+    async function loadLgas() {
+      if (lgaLayer) return lgaLayer;
+      const resp = await fetch(overlays.lgas || "/static/lagos_lgas_wgs84.geojson");
+      if (!resp.ok) throw new Error("LGA GeoJSON missing");
+      lgaLayer = L.geoJSON(await resp.json(), {
+        style: { color: "#7dd3fc", weight: 1.2, fill: false, dashArray: "4,3" },
+        onEachFeature: (feature, layer) => {
+          const name = (feature.properties && feature.properties.name) || "LGA";
+          layer.bindTooltip(name, { sticky: true });
         }
-        streamsLayer.addTo(map);
+      });
+      return lgaLayer;
+    }
+
+    async function loadValidation() {
+      if (validationLayer) return validationLayer;
+      const resp = await fetch("/api/validation/");
+      if (!resp.ok) throw new Error("validation points unavailable");
+      const payload = await resp.json();
+      validationLayer = L.layerGroup(
+        (payload.points || []).map((pt) => {
+          const flood = pt.site_type === "flood_prone";
+          const marker = L.circleMarker([pt.lat, pt.lon], {
+            radius: 5,
+            color: "#0b1524",
+            weight: 1,
+            fillColor: flood ? "#e31a1c" : "#2ca25f",
+            fillOpacity: 0.9
+          });
+          marker.bindTooltip(`${pt.name} (${flood ? "flood-prone" : "dry control"})`);
+          marker.on("click", () => inspectPoint(pt.lat, pt.lon, true));
+          return marker;
+        })
+      );
+      return validationLayer;
+    }
+
+    document.getElementById("toggle-streams").addEventListener("change", async (e) => {
+      if (e.target.checked) {
+        try {
+          (await loadStreams()).addTo(map);
+        } catch (err) {
+          e.target.checked = false;
+          setMessage(`Could not load drainage network: ${err.message}`, true);
+        }
       } else if (streamsLayer) {
         map.removeLayer(streamsLayer);
       }
     });
+
+    document.getElementById("toggle-lgas").addEventListener("change", async (e) => {
+      if (e.target.checked) {
+        try {
+          (await loadLgas()).addTo(map);
+        } catch (err) {
+          e.target.checked = false;
+          setMessage(`Could not load LGA boundaries: ${err.message}`, true);
+        }
+      } else if (lgaLayer) {
+        map.removeLayer(lgaLayer);
+      }
+    });
+
+    document.getElementById("toggle-validation").addEventListener("change", async (e) => {
+      if (e.target.checked) {
+        try {
+          (await loadValidation()).addTo(map);
+        } catch (err) {
+          e.target.checked = false;
+          setMessage(`Could not load validation sites: ${err.message}`, true);
+        }
+      } else if (validationLayer) {
+        map.removeLayer(validationLayer);
+      }
+    });
+
+    function setMessage(text, isError) {
+      const el = document.getElementById("val-message");
+      el.textContent = text || "";
+      el.classList.toggle("is-error", Boolean(isError));
+    }
 
     function formatMetric(value, unit, digits = 2) {
       if (value === null || value === undefined || Number.isNaN(Number(value))) {
@@ -656,8 +880,46 @@
       return `${Number(value).toFixed(digits)} <span class="metric-unit">${unit}</span>`;
     }
 
+    function setFactor(barId, textId, score) {
+      const bar = document.getElementById(barId);
+      const txt = document.getElementById(textId);
+      if (score === null || score === undefined) {
+        bar.style.width = "0%";
+        txt.textContent = "—";
+        return;
+      }
+      bar.style.width = `${(Number(score) / 3) * 100}%`;
+      txt.textContent = Number(score).toFixed(0);
+    }
+
+    function fillLegend() {
+      const classes = OVERLAY_META.classes || {};
+      const items = [
+        { id: "3", color: "#e31a1c", title: "High Susceptibility", sub: "Score ≥ high cutoff; low HAND, near drainage, built-up or low coastal elevation" },
+        { id: "2", color: "#feb24c", title: "Medium Susceptibility", sub: "Intermediate HAND, distance, slope, and land cover" },
+        { id: "1", color: "#2ca25f", title: "Low Susceptibility", sub: "Higher ground, farther from drainage, less impervious" },
+        { id: "0", color: "#38bdf8", title: "Permanent Water / Lagoon", sub: "Lagos Lagoon, creeks and Atlantic Ocean (WBM)", water: true }
+      ];
+      const root = document.getElementById("legend-list");
+      root.innerHTML = items.map((item) => {
+        const meta = classes[item.id] || {};
+        const share = item.water ? "Water" : (meta.land_share_pct != null ? `${meta.land_share_pct}%` : "—");
+        return `
+          <div class="legend-item">
+            <span class="swatch" style="background: ${item.color};"></span>
+            <div>
+              <span class="legend-desc">${item.title}</span>
+              <span class="legend-sub">${item.sub}</span>
+            </div>
+            <span class="legend-share">${share}</span>
+          </div>`;
+      }).join("");
+    }
+
     function updateInspectorUI(data) {
-      document.getElementById("val-latlon").textContent = `${Number(data.lat).toFixed(4)}°N, ${Number(data.lon).toFixed(4)}°E`;
+      if (data.lat != null && data.lon != null) {
+        document.getElementById("val-latlon").textContent = `${Number(data.lat).toFixed(4)}°N, ${Number(data.lon).toFixed(4)}°E`;
+      }
       if (data.utm_easting_m && data.utm_northing_m) {
         document.getElementById("val-utm").textContent = `${Math.round(data.utm_easting_m)}E, ${Math.round(data.utm_northing_m)}N`;
       } else {
@@ -672,7 +934,17 @@
       document.getElementById("val-hand").innerHTML = formatMetric(data.hand, "m", 2);
       document.getElementById("val-dist").innerHTML = formatMetric(data.distance_to_drainage, "m", 1);
       document.getElementById("val-slope").innerHTML = formatMetric(data.slope_deg, "°", 2);
-      document.getElementById("val-message").textContent = data.message || "";
+      document.getElementById("val-cover").textContent = data.landcover_label || "—";
+      document.getElementById("val-score").innerHTML = data.composite_score != null
+        ? `${Number(data.composite_score).toFixed(2)} <span class="metric-unit">/ 3</span>`
+        : "—";
+      setMessage(data.message || "", data.status === "error");
+
+      setFactor("bar-hand", "txt-hand-s", data.hand_score);
+      setFactor("bar-dist", "txt-dist-s", data.distance_score);
+      setFactor("bar-slope", "txt-slope-s", data.slope_score);
+      setFactor("bar-imp", "txt-imp-s", data.impervious_score);
+      setFactor("bar-coast", "txt-coast-s", data.coastal_score);
 
       const markerEl = document.getElementById("hand-marker");
       const gaugeReading = document.getElementById("gauge-reading");
@@ -703,21 +975,31 @@
         activeMarker.setLatLng([lat, lon]);
       }
 
-      const response = await fetch(`/api/point/?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}`);
-      const data = await response.json();
+      let data;
+      try {
+        const response = await fetch(`/api/point/?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}`);
+        data = await response.json();
+        if (!response.ok && !data.message) {
+          data = { status: "error", message: `Point query failed (${response.status}).`, lat, lon };
+        }
+      } catch (err) {
+        data = { status: "error", message: `Point query failed: ${err.message}`, lat, lon, risk_class: "Error" };
+      }
       updateInspectorUI(data);
 
+      const scoreLine = data.composite_score != null ? `<div><strong>Score:</strong> ${data.composite_score} / 3</div>` : "";
       const popupHtml = `
         <div style="min-width: 195px; font-size: 12.5px; line-height: 1.5;">
           <div style="font-weight: 700; font-size: 13.5px; margin-bottom: 4px;">
-            Risk Class: ${data.risk_class}
+            Risk Class: ${data.risk_class || "Unknown"}
           </div>
-          <div><strong>Elevation:</strong> ${data.elevation !== null ? data.elevation + " m" : "N/A"}</div>
-          <div><strong>HAND:</strong> ${data.hand !== null ? data.hand + " m" : "N/A"}</div>
-          <div><strong>Nearest Drainage:</strong> ${data.distance_to_drainage !== null ? data.distance_to_drainage + " m" : "N/A"}</div>
-          <div><strong>Slope:</strong> ${data.slope_deg !== null ? data.slope_deg + "°" : "N/A"}</div>
+          <div><strong>Elevation:</strong> ${data.elevation != null ? data.elevation + " m" : "N/A"}</div>
+          <div><strong>HAND:</strong> ${data.hand != null ? data.hand + " m" : "N/A"}</div>
+          <div><strong>Nearest Drainage:</strong> ${data.distance_to_drainage != null ? data.distance_to_drainage + " m" : "N/A"}</div>
+          <div><strong>Slope:</strong> ${data.slope_deg != null ? data.slope_deg + "°" : "N/A"}</div>
+          ${scoreLine}
           <div style="color: #94a3b8; font-size: 11px; margin-top: 4px;">
-            UTM 31N: ${Math.round(data.utm_easting_m)}E, ${Math.round(data.utm_northing_m)}N
+            ${data.utm_easting_m != null ? `UTM 31N: ${Math.round(data.utm_easting_m)}E, ${Math.round(data.utm_northing_m)}N` : ""}
           </div>
         </div>
       `;
@@ -736,7 +1018,59 @@
       });
     });
 
-    // Sample initial benchmark point on load (Kosofe / Ogun River floodplain)
+    const searchInput = document.getElementById("place-search");
+    const searchResults = document.getElementById("search-results");
+    let searchTimer = null;
+
+    function hideSearch() {
+      searchResults.style.display = "none";
+      searchResults.innerHTML = "";
+    }
+
+    searchInput.addEventListener("input", () => {
+      const q = searchInput.value.trim();
+      clearTimeout(searchTimer);
+      if (q.length < 2) {
+        hideSearch();
+        return;
+      }
+      searchTimer = setTimeout(async () => {
+        try {
+          const resp = await fetch(`/api/search/?q=${encodeURIComponent(q)}`);
+          const payload = await resp.json();
+          const hits = payload.results || [];
+          if (!hits.length) {
+            searchResults.innerHTML = `<button type="button" disabled>No matches</button>`;
+            searchResults.style.display = "block";
+            return;
+          }
+          searchResults.innerHTML = hits.map((hit) => `
+            <button type="button" data-lat="${hit.lat}" data-lon="${hit.lon}">
+              ${hit.name}
+              <span class="hit-meta">${hit.kind || ""}${hit.lga ? " · " + hit.lga : ""}</span>
+            </button>
+          `).join("");
+          searchResults.style.display = "block";
+          searchResults.querySelectorAll("button[data-lat]").forEach((btn) => {
+            btn.addEventListener("click", () => {
+              inspectPoint(parseFloat(btn.getAttribute("data-lat")), parseFloat(btn.getAttribute("data-lon")), true);
+              hideSearch();
+            });
+          });
+        } catch (err) {
+          setMessage(`Search failed: ${err.message}`, true);
+        }
+      }, 220);
+    });
+
+    document.addEventListener("click", (e) => {
+      if (!e.target.closest(".search-wrap")) {
+        hideSearch();
+      }
+    });
+
+    fillLegend();
+    applyOverlayMode();
     inspectPoint(6.5880, 3.4020, false);
   </script>
 </body>

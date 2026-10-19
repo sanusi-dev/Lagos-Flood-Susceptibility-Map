@@ -18,37 +18,51 @@
     "dist_medium_max_m": 600.0,
     "slope_flat_max_deg": 1.5,
     "slope_moderate_max_deg": 3.0,
+    "coastal_high_max_m": 2.0,
+    "coastal_medium_max_m": 5.0,
+    "coastal_influence_m": 2000.0,
     "weights": {
-      "hand": 0.6,
-      "distance_to_drainage": 0.25,
-      "slope": 0.15
+      "hand": 0.45,
+      "distance_to_drainage": 0.2,
+      "slope": 0.1,
+      "impervious": 0.25
     },
     "score_cutoffs": {
       "high_min": 2.4,
       "medium_min": 1.75
-    }
+    },
+    "combine": "max(runoff_weighted, coastal) within 2 km of open water"
+  },
+  "overlays": {
+    "classified": "/static/risk_overlay_wgs84.png",
+    "high": "/static/risk_overlay_high_wgs84.png",
+    "medium": "/static/risk_overlay_medium_wgs84.png",
+    "low": "/static/risk_overlay_low_wgs84.png",
+    "score": "/static/score_overlay_wgs84.png",
+    "lgas": "/static/lagos_lgas_wgs84.geojson",
+    "streams": "/static/streams_wgs84.geojson"
   },
   "classes": {
     "1": {
       "label": "Low",
       "color_hex": "#2ca25f",
-      "land_cells": 2023844,
-      "land_area_km2": 1821.46,
-      "land_share_pct": 43.26
+      "land_cells": 1783879,
+      "land_area_km2": 1605.49,
+      "land_share_pct": 38.13
     },
     "2": {
       "label": "Medium",
       "color_hex": "#feb24c",
-      "land_cells": 838760,
-      "land_area_km2": 754.88,
-      "land_share_pct": 17.93
+      "land_cells": 1844121,
+      "land_area_km2": 1659.71,
+      "land_share_pct": 39.42
     },
     "3": {
       "label": "High",
       "color_hex": "#e31a1c",
-      "land_cells": 1815470,
-      "land_area_km2": 1633.92,
-      "land_share_pct": 38.81
+      "land_cells": 1050074,
+      "land_area_km2": 945.07,
+      "land_share_pct": 22.45
     },
     "0": {
       "label": "Water / NoData",

@@ -7,6 +7,7 @@ ENV/
 __pycache__/
 *.py[cod]
 *$py.class
+.pytest_cache/
 
 # Raw downloads and large intermediate GeoTIFFs (regenerated via `python -m pipeline.run_all`)
 data/raw/

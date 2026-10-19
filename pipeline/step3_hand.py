@@ -29,6 +29,7 @@ from pipeline.config import (
     OSM_WATERWAYS_WGS84_PATH,
     SLOPE_UTM31N_PATH,
     STREAMS_RASTER_UTM31N_PATH,
+    SYSTEM_CANALS_PATH,
     TARGET_RESOLUTION_M,
     UTM_CRS,
     WBM_UTM31N_PATH,
@@ -97,6 +98,15 @@ def build_drainage_target_raster(force: bool = False) -> Path:
 
     gdf_osm = gpd.read_file(OSM_WATERWAYS_UTM31N_PATH)
     osm_shapes = [(geom, 1) for geom in gdf_osm.geometry if geom is not None and not geom.is_empty]
+    if SYSTEM_CANALS_PATH.exists():
+        gdf_canals = gpd.read_file(SYSTEM_CANALS_PATH)
+        if gdf_canals.crs is None:
+            gdf_canals = gdf_canals.set_crs(WGS84_CRS)
+        gdf_canals = gdf_canals.to_crs(UTM_CRS)
+        osm_shapes.extend(
+            (geom, 1) for geom in gdf_canals.geometry if geom is not None and not geom.is_empty
+        )
+        print(f"[process] Merged {len(gdf_canals)} System 1–6 canal trunks into drainage target.")
     osm_raster = rasterize(
         shapes=osm_shapes,
         out_shape=(height, width),
@@ -366,4 +376,9 @@ def run_step3(force: bool = False) -> None:
 
 
 if __name__ == "__main__":
-    run_step3()
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Compute HAND, distance to drainage, and slope.")
+    parser.add_argument("--force", action="store_true")
+    args = parser.parse_args()
+    run_step3(force=args.force)
