@@ -2,7 +2,7 @@
 
 Terrain-based flood susceptibility map for Lagos, Nigeria (`3.0°E–4.0°E`, `6.3°N–6.8°N`) at 30 m resolution.
 
-The GIS pipeline scores land cells from elevation, drainage, slope, built-up land cover, and coastal/lagoon proximity. A Django + Leaflet app serves the map and a point-query API. This is a screening map of where runoff and low-lying coastal water are likely to collect. It is not a weather forecast.
+The GIS pipeline scores land cells from elevation, drainage, slope, built-up land cover, and coastal/lagoon proximity. A Django and Leaflet app serves the map and a point-query API. This is a screening map of where runoff and low-lying coastal water are likely to collect.
 
 ![Lagos flood susceptibility map](data/outputs/lagos_risk_map.png)
 
@@ -92,4 +92,4 @@ Thresholds and weights are in `pipeline/config.py`. Scoring lives in `pipeline/s
 
 ## Limits
 
-Copernicus GLO-30 is a 30 m DSM, so buildings and canopy raise elevations in built-up areas. HAND models gravity-driven runoff; the coastal factor is a simple elevation screen, not a tide or surge model. OSM and the System 1–6 trunks are incomplete and have no channel capacity. Use this as a prototype screening tool, not for engineering, insurance, or emergency planning.
+Copernicus GLO-30 is a 30 m DSM, so buildings and canopy raise elevations in built-up areas. HAND models gravity-driven runoff; the coastal factor is a simple elevation screen. OSM and the System 1–6 trunks are incomplete and have no channel capacity. Use this as a prototype screening tool only.
